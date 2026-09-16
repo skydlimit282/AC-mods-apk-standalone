@@ -1,144 +1,110 @@
 using UnityEngine;
+using UnityEngine.UI;
 using MelonLoader;
 
-[assembly: MelonInfo(typeof(AnimalCompanyMod.DevMenu), "Animal Company Custom Canvas", "1.1.0", "Developer")]
+[assembly: MelonInfo(typeof(AnimalCompanyMod.SkydlimitsMenu), "skydlimits v1.1", "1.1.0", "Developer")]
 [assembly: MelonGame("DefaultCompany", "Animal Company")]
 
 namespace AnimalCompanyMod
 {
-    public class DevMenu : MelonMod
+    public class SkydlimitsMenu : MelonMod
     {
-        // UI Layout Configuration
-        private bool isMenuOpen = true;
-        private Rect windowRect = new Rect(80, 80, 450, 400); // Widened layout for columns
-        private int activeTab = 0; // Tracks which category tab is selected
-
-        // Feature Configurations
+        // VR Menu State & Objects
+        private GameObject menuCanvasObject;
+        private bool isMenuOpen = false;
+        
+        // Active Toggles
         private bool toggleFly = false;
         private bool toggleSpeed = false;
         private float speedMultiplier = 1.0f;
-        
-        // Soundboard References
-        private AudioSource modAudioSource;
-        private AudioClip sampleClip;
 
         public override void OnUpdate()
         {
-            // VR Binding: KeyCode.JoystickButton2 is the 'X' Button on the Meta Quest Left Controller
-            // Desktop Binding: 'Insert' key remains as a laptop backup option
+            // VR Toggle: Press 'X' on Meta Quest Left Controller to spawn/despawn the menu
             if (Input.GetKeyDown(KeyCode.JoystickButton2) || Input.GetKeyDown(KeyCode.Insert))
             {
                 isMenuOpen = !isMenuOpen;
+                ToggleVRMenu(isMenuOpen);
+            }
+
+            // Keep the menu floating relative to the player's position when open
+            if (isMenuOpen && menuCanvasObject != null)
+            {
+                UpdateMenuPosition();
             }
         }
 
-        public override void OnGUI()
+        private void ToggleVRMenu(bool open)
         {
-            if (!isMenuOpen) return;
-
-            // Apply custom dark theme aesthetic colors
-            GUI.backgroundColor = new Color(0.1f, 0.1f, 0.1f, 1.0f); 
-        windowRect = GUI.Window(0, windowRect, DrawWindowContent, "skydlimits v1.1");
-
-        }
-
-        private void DrawWindowContent(int windowID)
-        {
-            // Reset content color for clear text reading
-            GUI.backgroundColor = Color.gray;
-            GUILayout.Space(5);
-
-            // Horizontal Tab Bar: Replicating structured tab navigation styles
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Toggle(activeTab == 0, "Movement Mods", "Button", GUILayout.Height(30))) activeTab = 0;
-            if (GUILayout.Toggle(activeTab == 1, "Soundboard", "Button", GUILayout.Height(30))) activeTab = 1;
-            if (GUILayout.Toggle(activeTab == 2, "Utility Options", "Button", GUILayout.Height(30))) activeTab = 2;
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(15);
-
-            // Dynamically render layout content based on the selected tab
-            switch (activeTab)
+            if (open)
             {
-                case 0:
-                    DrawMovementTab();
-                    break;
-                case 1:
-                    DrawSoundboardTab();
-                    break;
-                case 2:
-                    DrawUtilityTab();
-                    break;
+                if (menuCanvasObject == null)
+                {
+                    Create3DWorldCanvas();
+                }
+                menuCanvasObject.SetActive(true);
             }
-
-            // Pin the exit option to the baseline of the window frame
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Hide Menu Layout", GUILayout.Height(25)))
+            else
             {
-                isMenuOpen = false;
-            }
-
-            // Allows dragging the panel by interacting with the title bar layout frame
-            GUI.DragWindow(new Rect(0, 0, 10000, 20));
-        }
-
-        private void DrawMovementTab()
-        {
-            GUILayout.Label("--- Physics & Positioning Toggles ---", GUILayout.ExpandWidth(true));
-            GUILayout.Space(10);
-
-            toggleFly = GUILayout.Toggle(toggleFly, " Enable Workspace Flight Mode");
-            GUILayout.Space(5);
-
-            toggleSpeed = GUILayout.Toggle(toggleSpeed, " Enable Velocity Override");
-            if (toggleSpeed)
-            {
-                GUILayout.BeginHorizontal();
-                GUILayout.Label($"Multiplier: {speedMultiplier:F1}x", GUILayout.Width(110));
-                speedMultiplier = GUILayout.HorizontalSlider(speedMultiplier, 1.0f, 12.0f);
-                GUILayout.EndHorizontal();
+                if (menuCanvasObject != null)
+                {
+                    menuCanvasObject.SetActive(false);
+                }
             }
         }
 
-        private void DrawSoundboardTab()
+        private void Create3DWorldCanvas()
         {
-            GUILayout.Label("--- Local Audio Output Soundboard ---", GUILayout.ExpandWidth(true));
-            GUILayout.Space(10);
+            // 1. Create Main World Space Object
+            menuCanvasObject = new GameObject("SkydlimitsCanvasFrame");
+            Canvas canvas = menuCanvasObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.WorldSpace;
+            menuCanvasObject.AddComponent<CanvasScaler>();
+            menuCanvasObject.AddComponent<GraphicRaycaster>();
 
-            // Audio trigger panel buttons arranged vertically
-            if (GUILayout.Button("🔊 Trigger Playback Effect 1", GUILayout.Height(35)))
-            {
-                PlaySoundboardEffect();
-            }
-            GUILayout.Space(5);
-            if (GUILayout.Button("🔊 Trigger Playback Effect 2", GUILayout.Height(35)))
-            {
-                PlaySoundboardEffect();
-            }
+            // Resize the floating menu board
+            RectTransform rect = menuCanvasObject.GetComponent<RectTransform>();
+            rect.sizeDelta = new Vector2(4f, 5f);
+            rect.localScale = new Vector3(0.1f, 0.1f, 0.1f);
+
+            // 2. Create the Background Board Visual
+            GameObject background = new GameObject("BackgroundPanel");
+            background.transform.SetParent(menuCanvasObject.transform, false);
+            Image bgImage = background.AddComponent<Image>();
+            bgImage.color = new Color(0.05f, 0.05f, 0.05f, 0.95f); // Sleek dark aesthetic
+            background.GetComponent<RectTransform>().sizeDelta = new Vector2(4f, 5f);
+
+            // 3. Create the Header Text Bar ("skydlimits v1.1")
+            GameObject headerObj = new GameObject("HeaderText");
+            headerObj.transform.SetParent(menuCanvasObject.transform, false);
+            Text headerText = headerObj.AddComponent<Text>();
+            headerText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            headerText.text = "skydlimits v1.1";
+            headerText.fontSize = 32;
+            headerText.alignment = TextAnchor.MiddleCenter;
+            headerText.color = Color.cyan; // Cyan primary accent theme
+
+            RectTransform headerRect = headerObj.GetComponent<RectTransform>();
+            headerRect.anchoredPosition = new Vector2(0, 2.2f);
+            headerRect.sizeDelta = new Vector2(4f, 0.5f);
+
+            // Initial positioning in front of the VR camera view layout
+            UpdateMenuPosition();
+            Object.DontDestroyOnLoad(menuCanvasObject);
         }
 
-        private void DrawUtilityTab()
+        private void UpdateMenuPosition()
         {
-            GUILayout.Label("--- Administrative Tool Utilities ---", GUILayout.ExpandWidth(true));
-            GUILayout.Space(10);
-
-            if (GUILayout.Button("Reset Transform Positions", GUILayout.Height(30)))
+            // Finds the VR Main Camera tag and places the board 2 meters directly in front of your face
+            Transform cameraTransform = Camera.main != null ? Camera.main.transform : null;
+            if (cameraTransform != null)
             {
-                GameObject player = GameObject.FindGameObjectWithTag("Player");
-                if (player != null) player.transform.position = Vector3.zero;
-            }
-        }
-
-        private void PlaySoundboardEffect()
-        {
-            if (modAudioSource == null)
-            {
-                modAudioSource = GameObject.FindGameObjectWithTag("Player")?.GetComponent<AudioSource>();
-            }
-
-            if (modAudioSource != null && sampleClip != null)
-            {
-                modAudioSource.PlayOneShot(sampleClip);
+                Vector3 targetPosition = cameraTransform.position + (cameraTransform.forward * 2.0f);
+                menuCanvasObject.transform.position = targetPosition;
+                
+                // Rotates the board so it flatly faces the player's eyes
+                menuCanvasObject.transform.lookAt(cameraTransform.position);
+                menuCanvasObject.transform.Rotate(0, 180, 0); 
             }
         }
     }
