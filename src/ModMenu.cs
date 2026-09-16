@@ -38,7 +38,8 @@ namespace AnimalCompanyMod
 
             // Apply custom dark theme aesthetic colors
             GUI.backgroundColor = new Color(0.1f, 0.1f, 0.1f, 1.0f); 
-            windowRect = GUI.Window(0, windowRect, DrawWindowContent, "Animal Company Custom Controller Layout");
+        windowRect = GUI.Window(0, windowRect, DrawWindowContent, "skydlimits v1.1");
+
         }
 
         private void DrawWindowContent(int windowID)
