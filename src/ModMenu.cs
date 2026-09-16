@@ -17,9 +17,12 @@ namespace AnimalCompanyMod
         private bool isJoystickFlyEnabled = false;
         private float flySpeed = 10f;
 
+        // Soundboard Configuration Data
+        private AudioSource audioSourceLink;
+
         public override void OnUpdate()
         {
-            // VR Toggle: Press 'X' on Quest Left Controller to spawn/despawn the physical board
+            // Toggle physical layout presence
             if (Input.GetKeyDown(KeyCode.JoystickButton2) || Input.GetKeyDown(KeyCode.Insert))
             {
                 isMenuOpen = !isMenuOpen;
@@ -53,30 +56,40 @@ namespace AnimalCompanyMod
 
         private void CreatePhysical3DMenu()
         {
-            // 1. Create the Main Menu Board Container
             menuFrameObject = new GameObject("Skydlimits_3DBoard");
             
-            // 2. Create a physical background slate (a thin 3D Cube)
+            // Build the main dark physical panel backing board
             GameObject boardVisual = GameObject.CreatePrimitive(PrimitiveType.Cube);
             boardVisual.name = "BoardVisual";
             boardVisual.transform.SetParent(menuFrameObject.transform, false);
-            boardVisual.transform.localScale = new Vector3(0.6f, 0.8f, 0.02f); // Width, Height, Thickness
-            boardVisual.GetComponent<Renderer>().material.color = new Color(0.05f, 0.05f, 0.05f); // Sleek Dark Slate
+            boardVisual.transform.localScale = new Vector3(0.8f, 1.0f, 0.02f); 
+            boardVisual.GetComponent<Renderer>().material.color = new Color(0.05f, 0.05f, 0.05f);
 
-            // 3. Spawn Physical 3D Buttons (Cubes) with custom trigger behaviors
-            CreatePhysicalButton("Btn_HandFly", new Vector3(0, 0.2f, 0.02f), Color.cyan, () => {
+            // Row 1: Core Physics & Positioning Modifiers
+            CreatePhysicalButton("Btn_HandFly", new Vector3(-0.2f, 0.3f, 0.02f), Color.cyan, () => {
                 isFlyEnabled = !isFlyEnabled;
                 isJoystickFlyEnabled = false;
-                MelonLogger.Msg($"[skydlimits] Physical Hand Fly: {isFlyEnabled}");
             });
 
-            CreatePhysicalButton("Btn_JoystickFly", new Vector3(0, 0.0f, 0.02f), Color.blue, () => {
+            CreatePhysicalButton("Btn_JoystickFly", new Vector3(0.2f, 0.3f, 0.02f), Color.blue, () => {
                 isJoystickFlyEnabled = !isJoystickFlyEnabled;
                 isFlyEnabled = false;
-                MelonLogger.Msg($"[skydlimits] Physical Joystick Fly: {isJoystickFlyEnabled}");
             });
 
-            CreatePhysicalButton("Btn_Teleport", new Vector3(0, -0.2f, 0.02f), Color.magenta, () => {
+            // Row 2 & 3: Local Soundboard Panel (Queries internal asset clips at runtime)
+            CreatePhysicalButton("Sfx_Boombox", new Vector3(-0.2f, 0.0f, 0.02f), Color.yellow, () => {
+                TriggerPreloadedGameSound("Boombox"); // Audio string identifier tag
+            });
+
+            CreatePhysicalButton("Sfx_MonsterRoar", new Vector3(0.2f, 0.0f, 0.02f), Color.red, () => {
+                TriggerPreloadedGameSound("Banshee"); // Creature vocalization tag
+            });
+
+            CreatePhysicalButton("Sfx_LaserTool", new Vector3(-0.2f, -0.3f, 0.02f), Color.green, () => {
+                TriggerPreloadedGameSound("MiningLaser"); // Item effect asset tag
+            });
+
+            CreatePhysicalButton("Btn_TeleportOrigin", new Vector3(0.2f, -0.3f, 0.02f), Color.magenta, () => {
                 ExecuteTeleport(Vector3.zero);
             });
 
@@ -86,35 +99,27 @@ namespace AnimalCompanyMod
 
         private void CreatePhysicalButton(string buttonName, Vector3 localPos, Color buttonColor, System.Action onTouchAction)
         {
-            // Create a small 3D Box for the button geometry
             GameObject btnObj = GameObject.CreatePrimitive(PrimitiveType.Cube);
             btnObj.name = buttonName;
             btnObj.transform.SetParent(menuFrameObject.transform, false);
             btnObj.transform.localPosition = localPos;
-            btnObj.transform.localScale = new Vector3(0.4f, 0.12f, 0.04f); // Dimension of the button box
+            btnObj.transform.localScale = new Vector3(0.35f, 0.15f, 0.04f); 
             btnObj.GetComponent<Renderer>().material.color = buttonColor;
 
-            // Turn its Collider into a Trigger so the hand can pass through it to click it
             BoxCollider collider = btnObj.GetComponent<BoxCollider>();
-            if (collider != null)
-            {
-                collider.isTrigger = true;
-            }
+            if (collider != null) collider.isTrigger = true;
 
-            // Attach a small component to listen for the hand sphere collision intersection
             TouchButtonTrigger listener = btnObj.AddComponent<TouchButtonTrigger>();
             listener.Initialize(onTouchAction, buttonColor);
         }
 
         private void CreateHandTouchSphere()
         {
-            // Spawns a physical tracking sphere on your right hand controller structure
             touchSphereObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             touchSphereObject.name = "Skydlimits_TouchSphere";
-            touchSphereObject.transform.localScale = new Vector3(0.08f, 0.08f, 0.08f); // Small finger/hand sized ball
+            touchSphereObject.transform.localScale = new Vector3(0.08f, 0.08f, 0.08f);
             touchSphereObject.GetComponent<Renderer>().material.color = Color.white;
 
-            // Add a Rigidbody so Unity calculates physics overlap intersections correctly
             Rigidbody rb = touchSphereObject.AddComponent<Rigidbody>();
             rb.isKinematic = true; 
             rb.useGravity = false;
@@ -127,18 +132,38 @@ namespace AnimalCompanyMod
             Transform cameraTransform = Camera.main != null ? Camera.main.transform : null;
             if (cameraTransform != null)
             {
-                // Floats the 3D block board 1.2 meters away in front of you
                 menuFrameObject.transform.position = cameraTransform.position + (cameraTransform.forward * 1.2f);
                 menuFrameObject.transform.lookAt(cameraTransform.position);
                 menuFrameObject.transform.Rotate(0, 180, 0);
             }
 
-            // Automatically maps our physical white ball to wherever your Right VR Controller points
-            // JoystickButton15/Right Hand Anchor points
             GameObject rightHand = GameObject.Find("RightHand") ?? GameObject.Find("RightController");
             if (rightHand != null && touchSphereObject != null)
             {
                 touchSphereObject.transform.position = rightHand.transform.position;
+            }
+        }
+
+        private void TriggerPreloadedGameSound(string assetKeyword)
+        {
+            // Locate local client layout voice output pipeline components
+            if (audioSourceLink == null)
+            {
+                audioSourceLink = GameObject.FindGameObjectWithTag("Player")?.GetComponent<AudioSource>();
+            }
+
+            if (audioSourceLink == null) return;
+
+            // Queries active internal Unity runtime assets to match sample names
+            AudioClip[] objectsInMemory = Resources.FindObjectsOfTypeAll<AudioClip>();
+            foreach (AudioClip sampleClip in objectsInMemory)
+            {
+                if (sampleClip.name.Contains(assetKeyword))
+                {
+                    audioSourceLink.PlayOneShot(sampleClip);
+                    MelonLogger.Msg($"[skydlimits] Found and executed clip file matching: {sampleClip.name}");
+                    break;
+                }
             }
         }
 
@@ -168,7 +193,6 @@ namespace AnimalCompanyMod
         }
     }
 
-    // Helper component attached to each 3D button block to watch for physical touches
     public class TouchButtonTrigger : MonoBehaviour
     {
         private System.Action triggerAction;
@@ -188,15 +212,13 @@ namespace AnimalCompanyMod
 
         private void OnTriggerEnter(Collider other)
         {
-            // Verify if the object entering our button box space is the white hand touch ball
             if (other.gameObject.name == "Skydlimits_TouchSphere" && cooldownTimer <= 0)
             {
-                cooldownTimer = 0.6f; // Prevent rapid clicking flickering anomalies
-                GetComponent<Renderer>().material.color = Color.green; // Flash green on click success
+                cooldownTimer = 0.5f; 
+                GetComponent<Renderer>().material.color = Color.green; 
                 
                 triggerAction?.Invoke();
                 
-                // Return to base coloring after a brief touch confirmation window
                 MelonCoroutines.Start(ResetColorRoutine());
             }
         }
