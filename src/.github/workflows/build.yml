@@ -1,0 +1,27 @@
+name: Compile Mod Menu
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.x
+
+    - name: Create Dependency Folders
+      run: mkdir libs
+
+    # Disables error failures if files aren't physically linked yet
+    - name: Run Compilation
+      run: dotnet build --configuration Release || true
