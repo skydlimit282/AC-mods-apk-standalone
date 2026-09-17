@@ -1,0 +1,30 @@
+name: Compile MelonLoader Mod
+
+on:
+  workflow_dispatch: # Allows manual execution from the browser
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '6.0.x'
+
+    - name: Compile Mod Library
+      run: |
+        mkdir build
+        # Compiles the C# source into the target managed game assembly
+        csc /target:library /out:build/AnimalCompanyMod.dll /r:System.dll src/ModMenu.cs
+      shell: cmd
+
+    - name: Upload Mod DLL
+      uses: actions/upload-artifact@v4
+      with:
+        name: AnimalCompanyMod-DLL
+        path: build/AnimalCompanyMod.dll
